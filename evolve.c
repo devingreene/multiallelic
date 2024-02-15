@@ -40,27 +40,12 @@ typedef struct _params{
     double threshold;
 } params;
 
-void print_list_double(char *label, double *arr, uint length){
-    uint i = 0;
-    printf("%s: [%g",label,arr[i++]);
-    for(;i < length;i++)
-        printf(" %g",arr[i]);
-    printf("]\n");
-}
-
-void print_list_uint(char *label, uint *arr, uint length){
-    uint i = 0;
-    printf("%s: [%u",label,arr[i++]);
-    for(;i < length;i++)
-        printf(" %u",arr[i]);
-    printf("]\n");
-}
-
 double sum(double *state, uint length){
     double rtvl = 0.;
     do{
         rtvl += state[--length];
     } while(length);
+    return rtvl;
 }
 
 uint power(uint n, uint p){
@@ -107,7 +92,6 @@ double *mk_mutation_tbl(params p){
     return rtvl;
 }
 
-/* TODO: This is wrong.  Fix it! */
 double *mk_recombination_tbl(params p){
     uint nloci = p.number_of_loci;
     uint nalleles = p.number_of_alleles;
@@ -229,25 +213,6 @@ char *base_converter(params p, uint x){
     return rtvl;
 }
 
-char *print_state(params p, double *state){
-    uint ngtypes = power(p.number_of_alleles, p.number_of_loci);
-    uint bufsize = ngtypes * (
-        p.number_of_loci + // number of digits
-        1 + // colon
-        30 ); // hopefully more than enough room for digits
-    char *rtvl = (char *)calloc(bufsize, sizeof(char));
-    int pos = 0;
-    uint gtype = 0;
-    for(;gtype < ngtypes;gtype++){
-        pos += sprintf(&rtvl[pos], "%s:", base_converter(p, gtype));
-        assert( pos < bufsize );
-        pos += sprintf(&rtvl[pos], "%.3f ", state[gtype]);
-        assert( pos < bufsize );
-    }
-    rtvl[pos-1] = '\0';
-    return rtvl;
-}
-
 int main(){
     uint nread;
     params p;
@@ -258,22 +223,6 @@ int main(){
                 sizeof(p),
                 nread);
     }
-
-    printf("\nC program:\nGot %u loci\n"
-            "Got %u alleles\n"
-            "Got %g rate of mutation\n"
-            "Got %g rate of recombination\n"
-            // "Got %lu population size\n"
-            "Got %u number of generations\n"
-            "Got %.15f threshold\n",
-            p.number_of_loci,
-            p.number_of_alleles,
-            p.rate_of_mutation,
-            p.rate_of_recombination,
-            // ,p.population_size
-            p.number_of_generations,
-            p.threshold
-            );
 
     uint nloci = p.number_of_loci;
     uint nalleles = p.number_of_alleles;
@@ -311,10 +260,6 @@ int main(){
     if(close(0) != 0)
         warnx("Couldn't close pipe from parser.");
 
-    print_list_double("initial_state", state, ngtypes);
-    print_list_double("fitness", fitness, ngtypes);
-    print_list_uint("target_genotypes", target_genotypes, ngtypes);
-
     double *recombination_tbl = mk_recombination_tbl(p);
     double *mutation_tbl = mk_mutation_tbl(p);
     
@@ -339,6 +284,6 @@ passed_threshold:
                 p.number_of_generations - n - 1);
         return 0;
     }
-    printf("%u generations run, no genotype passed theshold.\n",
+    printf("%u generations run, no genotype passed threshold.\n",
             p.number_of_generations);
 }

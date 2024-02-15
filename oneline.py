@@ -24,9 +24,6 @@ oneline_patterns = [number_of_loci,
 
 oneline_any = reduce(lambda x,y: x | y, oneline_patterns)
 
-def readout(toks):
-    eprint("{}: {}".format(*toks))
-
 def insert(toks):
     elements.update({toks[0]:toks[1]})
 
@@ -65,4 +62,3 @@ def assert_threshold_clamp(toks):
 for p in oneline_patterns:
     if p is not comment_filter:
         p.add_parse_action(insert)
-        p.add_parse_action(readout)

@@ -19,7 +19,7 @@ rate_of_recombination 1e-3
 # Population size (default 10000)
 
 # Number of generations (default 100)
-number_of_generations 100
+number_of_generations 10000
 
 # Data blocks:
 # One can put comment lines within the data block or as a line directly after

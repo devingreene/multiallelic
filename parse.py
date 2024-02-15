@@ -10,8 +10,6 @@ import multiline
 from oneline import elements
 from error_print import eprint
 
-eprint("Python program:")
-
 assert global_vars.nloci is not None and global_vars.nalleles is not None
 
 all_patterns = oneline.oneline_any | multiline.multiline_any
@@ -81,7 +79,6 @@ for mll,mlt in multiline.multiline_labels_types:
         exit(1)
     mlo = multiline.Multiline.register[mll]
     assert mlo.type == mlt
-    eprint("{}: {}".format(mlo.label, mlo.data))
 
     if mlo.type == 'dict':
         Type = 'double'
