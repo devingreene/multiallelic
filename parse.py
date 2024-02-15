@@ -16,6 +16,8 @@ assert global_vars.nloci is not None and global_vars.nalleles is not None
 
 all_patterns = oneline.oneline_any | multiline.multiline_any
 
+# TODO Parsing error should happen if whole line (without comments) is
+# not parsed.
 with open("input.txt", "r") as file:
     for line in file:
         line = line.strip()
@@ -54,25 +56,39 @@ with open("input.txt", "r") as file:
             eprint(e)
             exit(1)
 
+# Reasonable parameter checking
 global_vars.ngtypes = global_vars.nalleles**global_vars.nloci
 x = global_vars.ngtypes
 if  x*x*(x + 1) * 4 > 0x8000000:
     eprint("Size of tables would exceed memory bound")
     exit(1)
 
-cstruct = struct.pack("IIddIxxxx",
+cstruct = struct.pack("IIddId",
                       elements.get('number_of_loci', 0),
                       elements.get('number_of_alleles', 0),
                       elements.get('rate_of_mutation', 1e-9),
                       elements.get('rate_of_recombination', 0),
                       # elements.get('population_size', 10000),
                       elements.get('number_of_generations', 100),
+                      elements.get('threshold', 0.99)
                       )
 sys.stdout.buffer.write(cstruct)
 
-for mll in multiline.multiline_labels:
+for mll,mlt in multiline.multiline_labels_types:
+    if mll not in multiline.multiline_labels_found:
+        eprint("Parse error: Couldn't find line with: {}".
+               format(mll))
+        exit(1)
     mlo = multiline.Multiline.register[mll]
+    assert mlo.type == mlt
     eprint("{}: {}".format(mlo.label, mlo.data))
+
+    if mlo.type == 'dict':
+        Type = 'double'
+    elif mlo.type == 'list':
+        Type = 'uint'
+    else: assert False
+
     sys.stdout.buffer.write(
-            (ctypes.c_double * global_vars.ngtypes)(*mlo.data)
+            (getattr(ctypes,'c_' + Type) * global_vars.ngtypes)(*mlo.data)
     )

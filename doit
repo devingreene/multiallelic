@@ -1,7 +1,5 @@
 #!/bin/bash
 
-cc evolve.c -o evolve # For now
-
 # Test run: Stop if parsing errors
 if ! ./parse.py >/dev/null 2>&1
 then
@@ -10,5 +8,3 @@ then
 fi
 
 ./parse.py | ./evolve
-
-# vim: ft=sh

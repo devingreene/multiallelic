@@ -1,7 +1,8 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<unistd.h>
-#include<strings.h>
+#include<math.h>
+#include<string.h>
 #include<err.h>
 #include<assert.h>
 
@@ -36,13 +37,22 @@ typedef struct _params{
     /* Not implemented */
     // ulong population_size;
     uint number_of_generations;
+    double threshold;
 } params;
 
-void print_list(char* label, double *arr, uint length){
+void print_list_double(char *label, double *arr, uint length){
     uint i = 0;
-    printf("%s: [%g",label,arr[i]);
+    printf("%s: [%g",label,arr[i++]);
     for(;i < length;i++)
         printf(" %g",arr[i]);
+    printf("]\n");
+}
+
+void print_list_uint(char *label, uint *arr, uint length){
+    uint i = 0;
+    printf("%s: [%u",label,arr[i++]);
+    for(;i < length;i++)
+        printf(" %u",arr[i]);
     printf("]\n");
 }
 
@@ -52,7 +62,6 @@ double sum(double *state, uint length){
         rtvl += state[--length];
     } while(length);
 }
-
 
 uint power(uint n, uint p){
     uint rtvl= 1;
@@ -83,17 +92,22 @@ double *mk_mutation_tbl(params p){
     double *rtvl = calloc(ngtypes * ngtypes, sizeof(double));
 
     uint gtype1, gtype2;
+    /* TODO: Chase this restriction up the stack */
+    assert( p.number_of_alleles >= 2);
+    double nalts = (double)(p.number_of_alleles - 1);
 
     for_each_pair(gtype1, gtype2, ngtypes){
         ushort hd = hamming_dst(p, gtype1, gtype2);
-        rtvl[index(ngtypes, gtype1, gtype2)]\
-            = rtvl[index(ngtypes, gtype2, gtype1)]\
-            = power(p.rate_of_mutation, hd) * power(1. - p.rate_of_mutation, p.number_of_loci - hd);
+        rtvl[index(ngtypes, gtype1, gtype2)] =
+            rtvl[index(ngtypes, gtype2, gtype1)] =
+            pow(p.rate_of_mutation/nalts, hd) *
+            pow(1. - p.rate_of_mutation, p.number_of_loci - hd);
     }
 
     return rtvl;
 }
 
+/* TODO: This is wrong.  Fix it! */
 double *mk_recombination_tbl(params p){
     uint nloci = p.number_of_loci;
     uint nalleles = p.number_of_alleles;
@@ -104,7 +118,7 @@ double *mk_recombination_tbl(params p){
     uint gtype, gtype1, gtype2;
 
     for_each_pair(gtype1, gtype2, ngtypes){
-        for(gtype = 0; gtype < ngtypes; gtype++){
+        For(gtype){
             uint x = gtype1, y = gtype2, z = gtype;
             double entry = 1.;
             /* Think of gtypes as base 'nalleles' multidigit numbers. */
@@ -116,7 +130,7 @@ double *mk_recombination_tbl(params p){
                     entry = 0.;
                     break;
                 }
-                else if(digit1 != digit2)
+                if(digit1 != digit2)
                     entry *= 0.5;
                 x /= nalleles;
                 y /= nalleles;
@@ -125,7 +139,14 @@ double *mk_recombination_tbl(params p){
             tri_check_bound(ngtypes, gtype1, gtype2, gtype);
 
             entry *= p.rate_of_recombination;
-            entry += gtype1 == gtype || gtype2 == gtype?0.5 * (1 - p.rate_of_mutation):0;
+            if(gtype1 == gtype2 && gtype2 == gtype)
+                entry += (1 - p.rate_of_recombination);
+            else if(gtype == gtype1 || gtype == gtype2)
+                entry += 0.5 * (1 - p.rate_of_recombination);
+
+            /* Double probability for crosses */
+            if(gtype1 != gtype2) entry *= 2.;
+
             rtvl[tri_index(ngtypes, gtype1, gtype2, gtype)] = entry;
         }
     }
@@ -135,15 +156,13 @@ double *mk_recombination_tbl(params p){
 double *step(params p, double *state, double *scratch,
         double *fitness,
         double *recombination_tbl,
-        double *mutation_tbl){
+        double *mutation_tbl,
+        double population_size){
     uint nloci = p.number_of_loci;
     uint nalleles = p.number_of_alleles;
     uint ngtypes = power(nalleles, nloci);
 
     uint gtype1, gtype2, gtype3;
-
-    /* Record "population size" */
-    double start_sum = sum(state, ngtypes);
 
     /* First fitness */
     For(gtype1) state[gtype1] *= fitness[gtype1];
@@ -153,7 +172,9 @@ double *step(params p, double *state, double *scratch,
     for_each_pair(gtype1, gtype2, ngtypes){
         /* Take local segment of pair gtype1, gtype2 */
         double *ltbl = &recombination_tbl[tri_index(ngtypes,gtype1,gtype2,0)];
-        For(gtype3) scratch[gtype3] += ltbl[gtype3] * state[gtype1] * state[gtype2];
+        For(gtype3) scratch[gtype3] += ltbl[gtype3] *
+            state[gtype1] *
+            state[gtype2];
     }
 
     swapp(double, state, scratch);
@@ -164,19 +185,67 @@ double *step(params p, double *state, double *scratch,
         /* See above comment in recombination block */
         double *ltbl = &mutation_tbl[index(ngtypes,gtype1,0)];
         For(gtype2)
-            ltbl[gtype2] += ltbl[gtype2] * state[gtype1];
+            scratch[gtype2] += ltbl[gtype2] * state[gtype1];
     }
 
     swapp(double, state, scratch);
 
     /* Normalize */
     double after_sum = sum(state, ngtypes);
-    uint n = ngtypes;
-    do{
-        state[--n] *= start_sum / after_sum;
-    } while(n);
+
+    while(ngtypes--)
+        state[ngtypes] *= population_size / after_sum;
             
     return state;
+}
+
+uint check_threshold(params p, double *state, uint *target_genotypes,
+        uint ngtypes, double population_size){
+    uint i = 0;
+    for(; i < ngtypes; i++){
+        if(target_genotypes[i] == (uint)-1)
+            return -1;
+        assert(target_genotypes[i] < ngtypes);
+
+        if(state[target_genotypes[i]] > p.threshold * population_size){
+            return i;
+        }
+    }
+    return -1;
+}
+
+char *base_converter(params p, uint x){
+    assert( p.number_of_alleles <= 10 );
+
+    char *rtvl = (char *)malloc(p.number_of_loci * sizeof(char));
+    char s = '0';
+    uint n = p.number_of_loci;
+
+    memset((void*)rtvl, (int)s, n);
+    while(n--){
+        rtvl[n] = s + x % p.number_of_alleles;
+        x /= p.number_of_alleles;
+    }
+    return rtvl;
+}
+
+char *print_state(params p, double *state){
+    uint ngtypes = power(p.number_of_alleles, p.number_of_loci);
+    uint bufsize = ngtypes * (
+        p.number_of_loci + // number of digits
+        1 + // colon
+        30 ); // hopefully more than enough room for digits
+    char *rtvl = (char *)calloc(bufsize, sizeof(char));
+    int pos = 0;
+    uint gtype = 0;
+    for(;gtype < ngtypes;gtype++){
+        pos += sprintf(&rtvl[pos], "%s:", base_converter(p, gtype));
+        assert( pos < bufsize );
+        pos += sprintf(&rtvl[pos], "%.3f ", state[gtype]);
+        assert( pos < bufsize );
+    }
+    rtvl[pos-1] = '\0';
+    return rtvl;
 }
 
 int main(){
@@ -195,13 +264,15 @@ int main(){
             "Got %g rate of mutation\n"
             "Got %g rate of recombination\n"
             // "Got %lu population size\n"
-            "Got %u number of generations\n",
+            "Got %u number of generations\n"
+            "Got %.15f threshold\n",
             p.number_of_loci,
             p.number_of_alleles,
             p.rate_of_mutation,
             p.rate_of_recombination,
             // ,p.population_size
-            p.number_of_generations
+            p.number_of_generations,
+            p.threshold
             );
 
     uint nloci = p.number_of_loci;
@@ -218,8 +289,6 @@ int main(){
                 nread);
     }
 
-    print_list("initial_state", state, ngtypes);
-
     double *fitness = (double*)malloc(state_size);
     if((nread = read(0, fitness, state_size)) != state_size){
         errx(1, "Failed to read %lu bytes when reading: fitness."
@@ -228,12 +297,23 @@ int main(){
                 ,nread);
     }
 
+    uint target_genotypes_size = ngtypes * sizeof(uint);
+    uint *target_genotypes = (uint*)malloc(target_genotypes_size);
+    if((nread = read(0, target_genotypes, target_genotypes_size)) != target_genotypes_size){
+        errx(1, "Failed to read %u bytes when reading: target_genotypes."
+                "\nRead %u instead.",
+                target_genotypes_size,
+                nread);
+    }
+
     /* Piped from parser, so tell it that we're done by closing this
      * end. */
     if(close(0) != 0)
         warnx("Couldn't close pipe from parser.");
 
-    print_list("fitness", fitness, ngtypes);
+    print_list_double("initial_state", state, ngtypes);
+    print_list_double("fitness", fitness, ngtypes);
+    print_list_uint("target_genotypes", target_genotypes, ngtypes);
 
     double *recombination_tbl = mk_recombination_tbl(p);
     double *mutation_tbl = mk_mutation_tbl(p);
@@ -241,9 +321,24 @@ int main(){
     double *scratch = calloc(ngtypes, sizeof(double));
 
     uint n = p.number_of_generations;
-    do{
-        state = step(p, state, scratch, fitness,
-                recombination_tbl,
-                mutation_tbl);
-    } while(--n);
+
+    /* The simulation: We record the current sum and use it to normalize
+     * after each step */
+    double population_size = sum(state, ngtypes);
+    while(n--){
+        uint gtype;
+        if((gtype = check_threshold(p, state, target_genotypes,
+                        ngtypes, population_size)) != (uint)-1)
+            goto passed_threshold;
+        state = step(p, state, scratch, fitness, recombination_tbl,
+                mutation_tbl, population_size);
+        continue;
+passed_threshold:
+        printf("Genotype %s passed threshold at generation %d.\n",
+                base_converter(p, gtype),
+                p.number_of_generations - n - 1);
+        return 0;
+    }
+    printf("%u generations run, no genotype passed theshold.\n",
+            p.number_of_generations);
 }

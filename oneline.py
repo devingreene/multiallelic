@@ -13,12 +13,14 @@ rate_of_recombination = pp.Literal('rate_of_recombination') + pp.common.number
 # Not implemented
 # population_size = pp.Literal('population_size') + pp.common.integer
 number_of_generations = pp.Literal('number_of_generations') + pp.common.integer
+threshold = pp.Literal('threshold') + pp.common.number
 
 oneline_patterns = [number_of_loci,
             number_of_alleles,
             rate_of_mutation,
             rate_of_recombination,
-            number_of_generations]
+            number_of_generations,
+                    threshold]
 
 oneline_any = reduce(lambda x,y: x | y, oneline_patterns)
 
@@ -40,15 +42,25 @@ def getnloci(toks):
 @number_of_alleles.add_parse_action
 def getnalleles(toks):
     global_vars.nalleles = int(toks[1])
+
+    # TODO Only permiting nallles <= 10 at this point
+    if global_vars.nalleles > 10:
+        eprint("No support for number of alleles exceeding 10")
+        exit(1)
+
     global_vars.ngtypes = global_vars.nalleles**global_vars.nloci
 
 @rate_of_mutation.add_parse_action
 def assert_rate_clamp(toks):
-    assert 0. <= toks[1] < 1.
+    assert 0. <= toks[1] <= 1.
 
 @rate_of_recombination.add_parse_action
 def assert_rate_clamp(toks):
-    assert 0. <= toks[1] < 1.
+    assert 0. <= toks[1] <= 1.
+
+@threshold.add_parse_action
+def assert_threshold_clamp(toks):
+    assert 0. <= toks[1] <= 1.
 
 for p in oneline_patterns:
     if p is not comment_filter:
