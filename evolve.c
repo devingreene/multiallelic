@@ -192,7 +192,7 @@ uint check_threshold(params p, double *state, uint *target_genotypes,
         assert(target_genotypes[i] < ngtypes);
 
         if(state[target_genotypes[i]] > p.threshold * population_size){
-            return i;
+            return target_genotypes[i];
         }
     }
     return -1;
