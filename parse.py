@@ -2,6 +2,7 @@
 
 import pyparsing as pp
 import sys
+import os
 import struct
 import ctypes
 import global_vars
@@ -14,9 +15,13 @@ assert global_vars.nloci is not None and global_vars.nalleles is not None
 
 all_patterns = oneline.oneline_any | multiline.multiline_any
 
+file_name_num = sys.stdin.fileno()
+if os.isatty(0):
+    file_name_num = 'input.txt'
+
 # TODO Parsing error should happen if whole line (without comments) is
 # not parsed.
-with open("input.txt", "r") as file:
+with open(file_name_num, "r") as file:
     for line in file:
         line = line.strip()
 
