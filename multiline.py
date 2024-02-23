@@ -8,6 +8,12 @@ def multiline_parse_error(obj):
            format(obj.label))
     exit(1)
 
+def k_correct(obj,k):
+    assert isinstance(k,str) and k.isnumeric()
+    if len(k) != global_vars.nloci or\
+            any(not 0 <= int(c) < global_vars.nalleles for c in k):
+                multiline_parse_error(obj)
+
 data_patterns = {
         'dict': pp.ZeroOrMore(pp.Group(pp.Word(pp.nums) +  pp.Suppress(':') + pp.common.number.add_parse_action(pp.common.convertToFloat))),
         'list': pp.ZeroOrMore(pp.Word(pp.nums))
@@ -54,6 +60,7 @@ class Multiline:
             @self.data_pattern.add_parse_action
             def dict_repr(toks):
                 for k,v in toks:
+                    k_correct(self,k)
                     if k in self.dict:
                         multiline_parse_error(self)
                     try:
@@ -65,6 +72,7 @@ class Multiline:
             @self.data_pattern.add_parse_action
             def list_repr(toks):
                 for k in toks:
+                    k_correct(self,k)
                     if k in self.set:
                         multiline_parse_error(self)
                     try:
