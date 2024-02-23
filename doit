@@ -1,3 +1,4 @@
 #!/bin/bash
 
-./parse.py | ./evolve 2>/dev/null
+# TODO Suppress stderr of ./evolve if error in ./parse.py
+./parse.py | ./evolve "$@"

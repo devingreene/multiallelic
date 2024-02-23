@@ -1,6 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<unistd.h>
+#include<sys/ioctl.h>
 #include<math.h>
 #include<string.h>
 #include<err.h>
@@ -240,9 +241,23 @@ char *base_converter(params p, uint x){
     return rtvl;
 }
 
-int main(){
+int main(int argc, char **argv){
     uint nread;
     params p;
+    char progress = 0;
+
+    /* Check for progress option */
+    while(argc--)
+        if(strcmp(argv[argc], "--progress") == 0){
+            progress = 1;
+            break;
+        }
+
+    // TODO Only if terminal!
+    // TODO Adapt if terminal size changes?
+    /* Get winsize */
+    struct winsize w;
+    if(progress) ioctl(2, TIOCGWINSZ, &w);
 
     if((nread = read(0, &p, sizeof(p))) != sizeof(p)){
         errx(1, "Failed to read %lu bytes when reading parameters."
@@ -306,7 +321,21 @@ int main(){
     /* The simulation: We record the current sum and use it to normalize
      * after each step */
     double population_size = sum(state, ngtypes);
-    while(n--){
+    uint i;
+    ushort current = 0;
+    for(i = 0; i < n; i++){
+        if(progress){
+            uint bar = 0;
+            if(current < w.ws_col*i/n){
+                fprintf(stderr, "%c", '\r');
+                for(; bar < w.ws_col*i/n; bar++)
+                    fprintf(stderr, "%c", '-');
+                for(; bar < w.ws_col; bar++)
+                    fprintf(stderr, "%c", ' ');
+                fflush(stderr);
+                current = w.ws_col*i/n;
+            }
+        }
         uint gtype;
         if((gtype = check_threshold(p, state, target_genotypes,
                         ngtypes, population_size)) != (uint)-1)
@@ -315,11 +344,10 @@ int main(){
                 mutation_tbl, population_size);
         continue;
 passed_threshold:
-        printf("Genotype %s passed threshold at generation %d.\n",
-                base_converter(p, gtype),
-                p.number_of_generations - n - 1);
+        printf("\nGenotype %s passed threshold at generation %d.\n",
+                base_converter(p, gtype), i);
         return 0;
     }
-    printf("%u generations run, no genotype passed threshold.\n",
+    printf("\n%u generations run, no genotype passed threshold.\n",
             p.number_of_generations);
 }
