@@ -39,12 +39,13 @@ with open(file_name_num, "r") as file:
                 ml.exit()
             else:
                 # Mid-block full comments are allowed
+                # This uses regexps, so I don't think it can fail.
                 line = oneline.comment_filter.parse_string(line).asList()[0]
                 ml.lines.append(line)
             continue
 
         # Drop comments from line
-        # This uses regexps, so I don't think it can fail.
+        # Don't think this can fail
         line = oneline.comment_filter.parse_string(line).asList()[0]
         if line == '':
             continue
