@@ -23,9 +23,10 @@ class Multiline:
 
     register = {}
 
-    def __init__(self,label,Type):
+    def __init__(self,label,Type,default_value = None):
         self.label = label
         self.state = False
+        self.default_value = default_value
         assert Type == 'dict' or Type == 'list'
         self.type = Type
         self.dict = {}
@@ -39,7 +40,7 @@ class Multiline:
             multiline_labels_found.append(self.label)
             self.enter()
             if self.type == 'dict':
-                self.data = [None]*global_vars.ngtypes
+                self.data = [self.default_value]*global_vars.ngtypes
             elif self.type == 'list':
                 self.data = []
             else: assert False
@@ -98,11 +99,12 @@ class Multiline:
         if None in self.data:
             multiline_parse_error(self)
 
-multiline_labels_types = [('initial_state','dict'),
-                          ('fitness','dict'),
+# (label,Type,[default_value])
+multiline_labels_types = [('initial_state','dict',0.),
+                          ('fitness','dict',1.),
                           ('target_genotypes','list')]
 
-multiline_objects = [ Multiline(lab,Type) for lab,Type in multiline_labels_types ]
+multiline_objects = [ Multiline(*tup) for tup in multiline_labels_types ]
 
 multiline_any = reduce(lambda x,y:x|y, [x.firstline for x in multiline_objects])
 

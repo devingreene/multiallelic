@@ -77,7 +77,7 @@ cstruct = struct.pack("IIddId",
                       )
 sys.stdout.buffer.write(cstruct)
 
-for mll,mlt in multiline.multiline_labels_types:
+for mll,mlt,*_ in multiline.multiline_labels_types:
     if mll not in multiline.multiline_labels_found:
         eprint("Parse error: Couldn't find line with: {}".
                format(mll))
