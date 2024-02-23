@@ -40,6 +40,33 @@ typedef struct _params{
     double threshold;
 } params;
 
+#ifdef DUMP_INPUT
+void dump_parameters(params p){
+    printf("number_of_loci: %u\n", p.number_of_loci);
+    printf("number_of_alleles;: %u\n", p.number_of_alleles);
+    printf("rate_of_mutation: %e\n", p.rate_of_mutation);
+    printf("rate_of_recombination: %e\n", p.rate_of_recombination);
+    printf("number_of_generations: %u\n", p.number_of_generations);
+    printf("threshold: %e\n", p.threshold);
+}
+
+void dump_vector(char *name, double *vec, uint len){
+    uint i = 0;
+    printf("%s: %.3e", name, vec[i++]);
+    for(;i < len; i++)
+        printf(" %.3e",vec[i]);
+    printf("\n");
+}
+
+void dump_list(char *name, uint *list, uint len){
+    uint i = 0;
+    printf("%s: %u", name, list[i++]);
+    for(;i < len; i++)
+        printf(" %u",list[i]);
+    printf("\n");
+}
+#endif
+
 double sum(double *state, uint length){
     double rtvl = 0.;
     do{
@@ -259,6 +286,15 @@ int main(){
      * end. */
     if(close(0) != 0)
         warnx("Couldn't close pipe from parser.");
+
+#ifdef DUMP_INPUT
+    /* If we are dumping, do it here. */
+    dump_parameters(p);
+    dump_vector("initial state", state, ngtypes);
+    dump_vector("fitness", fitness, ngtypes);
+    dump_list("targets", target_genotypes, ngtypes);
+    return 0;
+#endif
 
     double *recombination_tbl = mk_recombination_tbl(p);
     double *mutation_tbl = mk_mutation_tbl(p);
