@@ -47,6 +47,7 @@ def getnalleles(toks):
 
     global_vars.ngtypes = global_vars.nalleles**global_vars.nloci
 
+# TODO Make these parse errors
 @rate_of_mutation.add_parse_action
 def assert_rate_clamp(toks):
     assert 0. <= toks[1] <= 1.

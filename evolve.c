@@ -2,6 +2,7 @@
 #include<stdlib.h>
 #include<unistd.h>
 #include<sys/ioctl.h>
+#include<termios.h>
 #include<math.h>
 #include<string.h>
 #include<err.h>
@@ -253,18 +254,19 @@ int main(int argc, char **argv){
             break;
         }
 
-    // TODO Only if terminal!
+    /* Check if stderr is terminal */
+    if(!isatty(fileno(stderr))) progress = 0;
+
     // TODO Adapt if terminal size changes?
     /* Get winsize */
     struct winsize w;
-    if(progress) ioctl(2, TIOCGWINSZ, &w);
+    if(progress) ioctl(fileno(stderr), TIOCGWINSZ, &w);
 
-    if((nread = read(0, &p, sizeof(p))) != sizeof(p)){
+    if((nread = read(0, &p, sizeof(p))) != sizeof(p))
         errx(1, "Failed to read %lu bytes when reading parameters."
                 "\nRead %u instead.",
                 sizeof(p),
                 nread);
-    }
 
     uint nloci = p.number_of_loci;
     uint nalleles = p.number_of_alleles;
@@ -273,29 +275,26 @@ int main(int argc, char **argv){
     ulong state_size = ngtypes * sizeof(double);
 
     double *state = (double*)malloc(state_size);
-    if((nread = read(0, state, state_size)) != state_size){
+    if((nread = read(0, state, state_size)) != state_size)
         errx(1, "Failed to read %lu bytes when reading: initial_state."
                 "\nRead %u instead.",
                 state_size,
                 nread);
-    }
 
     double *fitness = (double*)malloc(state_size);
-    if((nread = read(0, fitness, state_size)) != state_size){
+    if((nread = read(0, fitness, state_size)) != state_size)
         errx(1, "Failed to read %lu bytes when reading: fitness."
                 "\nRead %u instead."
                 ,state_size
                 ,nread);
-    }
 
     uint target_genotypes_size = ngtypes * sizeof(uint);
     uint *target_genotypes = (uint*)malloc(target_genotypes_size);
-    if((nread = read(0, target_genotypes, target_genotypes_size)) != target_genotypes_size){
+    if((nread = read(0, target_genotypes, target_genotypes_size)) != target_genotypes_size)
         errx(1, "Failed to read %u bytes when reading: target_genotypes."
                 "\nRead %u instead.",
                 target_genotypes_size,
                 nread);
-    }
 
     /* Piped from parser, so tell it that we're done by closing this
      * end. */
