@@ -343,10 +343,10 @@ int main(int argc, char **argv){
                 mutation_tbl, population_size);
         continue;
 passed_threshold:
-        printf("\nGenotype %s passed threshold at generation %d.\n",
-                base_converter(p, gtype), i);
+        printf("%sGenotype %s passed threshold at generation %d.\n",
+                progress?"\n":"",base_converter(p, gtype), i);
         return 0;
     }
-    printf("\n%u generations run, no genotype passed threshold.\n",
-            p.number_of_generations);
+    printf("%s%u generations run, no genotype passed threshold.\n",
+            progress?"\n":"",p.number_of_generations);
 }
