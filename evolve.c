@@ -245,12 +245,13 @@ char *base_converter(params p, uint x){
 int main(int argc, char **argv){
     uint nread;
     params p;
-    char progress = 0;
+    char progress = 1;
 
     /* Check for progress option */
     while(argc--)
-        if(strcmp(argv[argc], "--progress") == 0){
-            progress = 1;
+        if(strcmp(argv[argc], "-s") == 0
+                || strcmp(argv[argc],"--silent") == 0){
+            progress = 0;
             break;
         }
 
