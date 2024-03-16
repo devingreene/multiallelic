@@ -8,6 +8,8 @@
 #include<err.h>
 #include<assert.h>
 
+#define TIMELIST_LENGTH (50)
+
 #define uint unsigned int
 #define ulong unsigned long
 #define ushort unsigned short
@@ -242,6 +244,17 @@ char *base_converter(params p, uint x){
     return rtvl;
 }
 
+void print_report(FILE *stream, params p, uint ngtypes, uint time, double *state){
+    uint maxtime = p.number_of_generations - 1;
+    int width;
+    width = ceil(log10((double)(maxtime + 1)));
+    fprintf(stream, "%*u|", width, time);
+    uint i = 0;
+    for(; i < ngtypes; i++)
+        fprintf(stream, " %s:%.0f", base_converter(p, i), state[i]);
+    fprintf(stream, "\n");
+}
+
 int main(int argc, char **argv){
     uint nread;
     params p;
@@ -263,7 +276,7 @@ int main(int argc, char **argv){
     struct winsize w;
     if(progress) ioctl(fileno(stderr), TIOCGWINSZ, &w);
 
-    if((nread = read(0, &p, sizeof(p))) != sizeof(p))
+    if((nread = read(fileno(stdin), &p, sizeof(p))) != sizeof(p))
         errx(1, "Failed to read %lu bytes when reading parameters."
                 "\nRead %u instead.",
                 sizeof(p),
@@ -276,14 +289,14 @@ int main(int argc, char **argv){
     ulong state_size = ngtypes * sizeof(double);
 
     double *state = (double*)malloc(state_size);
-    if((nread = read(0, state, state_size)) != state_size)
+    if((nread = read(fileno(stdin), state, state_size)) != state_size)
         errx(1, "Failed to read %lu bytes when reading: initial_state."
                 "\nRead %u instead.",
                 state_size,
                 nread);
 
     double *fitness = (double*)malloc(state_size);
-    if((nread = read(0, fitness, state_size)) != state_size)
+    if((nread = read(fileno(stdin), fitness, state_size)) != state_size)
         errx(1, "Failed to read %lu bytes when reading: fitness."
                 "\nRead %u instead."
                 ,state_size
@@ -291,10 +304,18 @@ int main(int argc, char **argv){
 
     uint target_genotypes_size = ngtypes * sizeof(uint);
     uint *target_genotypes = (uint*)malloc(target_genotypes_size);
-    if((nread = read(0, target_genotypes, target_genotypes_size)) != target_genotypes_size)
+    if((nread = read(fileno(stdin), target_genotypes, target_genotypes_size)) != target_genotypes_size)
         errx(1, "Failed to read %u bytes when reading: target_genotypes."
                 "\nRead %u instead.",
                 target_genotypes_size,
+                nread);
+
+    uint report_points_size = TIMELIST_LENGTH * sizeof(uint);
+    uint *report_points = (uint*)malloc(report_points_size);
+    if((nread = read(fileno(stdin), report_points, report_points_size)) != report_points_size)
+        errx(1, "Failed to read %u bytes when reading: report_points."
+                "\nRead %u instead.",
+                report_points_size,
                 nread);
 
     /* Piped from parser, so tell it that we're done by closing this
@@ -308,6 +329,7 @@ int main(int argc, char **argv){
     dump_vector("initial state", state, ngtypes);
     dump_vector("fitness", fitness, ngtypes);
     dump_list("targets", target_genotypes, ngtypes);
+    dump_list("report_points", report_points, TIMELIST_LENGTH);
     return 0;
 #endif
 
@@ -323,7 +345,18 @@ int main(int argc, char **argv){
     double population_size = sum(state, ngtypes);
     uint i;
     ushort current = 0;
+
+    // Parameters for memstream
+    char *buf;
+    size_t end;
+
+    FILE *stream = open_memstream(&buf, &end);
+    fprintf(stream, "\nReport points:\n");
     for(i = 0; i < n; i++){
+        if(i == report_points[0]){
+            print_report(stream, p, ngtypes, i, state);
+            report_points++;
+        }
         if(progress){
             uint bar = 0;
             if(current < w.ws_col*i/n){
@@ -346,8 +379,11 @@ int main(int argc, char **argv){
 passed_threshold:
         printf("%sGenotype %s passed threshold at generation %d.\n",
                 progress?"\n":"",base_converter(p, gtype), i);
-        return 0;
+        goto report;
     }
     printf("%s%u generations run, no genotype passed threshold.\n",
             progress?"\n":"",p.number_of_generations);
+report:
+    fclose(stream);
+    printf("%s", buf);
 }

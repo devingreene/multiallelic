@@ -59,6 +59,11 @@ with open(file_name_num, "r") as file:
         except pp.ParseException as e:
             eprint(e)
             exit(1)
+    else:
+        # Exit for any unfinished blocks if we reach EOF
+        for ml in multiline.multiline_objects:
+            if ml.state:
+                ml.exit()
 
 # Reasonable parameter checking
 global_vars.ngtypes = global_vars.nalleles**global_vars.nloci
@@ -87,11 +92,12 @@ for mll,mlt,*_ in multiline.multiline_labels_types:
     assert mlo.type == mlt
 
     if mlo.type == 'dict':
-        Type = 'double'
-    elif mlo.type == 'list':
-        Type = 'uint'
+        sys.stdout.buffer.write(
+            (getattr(ctypes,'c_double') * global_vars.ngtypes)(*mlo.data)
+            )
+    elif mlo.type in ['list','timelist']:
+        sys.stdout.buffer.write(
+            (getattr(ctypes,'c_int') * mlo.maxlen)(*mlo.data)
+            )
     else: assert False
 
-    sys.stdout.buffer.write(
-            (getattr(ctypes,'c_' + Type) * global_vars.ngtypes)(*mlo.data)
-    )

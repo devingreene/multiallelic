@@ -24,7 +24,7 @@ number_of_generations 10000
 # Data blocks:
 # One can put comment lines within the data block or as a line directly after
 # the data block. There _must_ be a true (no comment) blank line after a data
-# block.
+# block, or the EOF
 
 initial_state #default value 0
 00:10000
@@ -48,3 +48,12 @@ target_genotypes 01 02 # a comment
 # Stop if a target genotype reaches this proportion or higher.  Default
 # 0.99
 threshold 0.999
+
+# Report current state at these points.  Can have at most 50 such points
+report_points 0 4 155 # Comment
+2 6
+5 6
+999
+10000
+# comment
+7

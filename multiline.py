@@ -3,6 +3,8 @@ from error_print import eprint
 import global_vars
 from functools import reduce
 
+TIMELIST_LENGTH = 50
+
 def multiline_parse_error(obj):
     eprint("Parsing error: Failed to parse block with label: {}".
            format(obj.label))
@@ -16,7 +18,8 @@ def k_correct(obj,k):
 
 data_patterns = {
         'dict': pp.ZeroOrMore(pp.Group(pp.Word(pp.nums) +  pp.Suppress(':') + pp.common.number.add_parse_action(pp.common.convertToFloat))),
-        'list': pp.ZeroOrMore(pp.Word(pp.nums))
+        'list': pp.ZeroOrMore(pp.Word(pp.nums)),
+        'timelist': pp.ZeroOrMore(pp.common.integer).add_parse_action(pp.common.convert_to_integer)
         }
 
 class Multiline:
@@ -27,7 +30,7 @@ class Multiline:
         self.label = label
         self.state = False
         self.default_value = default_value
-        assert Type == 'dict' or Type == 'list'
+        assert Type in ['dict', 'list', 'timelist']
         self.type = Type
         self.dict = {}
         self.set = set()
@@ -36,12 +39,18 @@ class Multiline:
 
         @self.firstline.set_parse_action
         def parseAction(s,loc,toks):
+            # maxlen assigned here to give parser a chance to know what
+            # ngtypes is.
+            if self.type == 'list':
+                self.maxlen = global_vars.ngtypes
+            elif self.type == 'timelist':
+                self.maxlen = TIMELIST_LENGTH
             self.lines.append(s.lstrip(self.label))
             multiline_labels_found.append(self.label)
             self.enter()
             if self.type == 'dict':
                 self.data = [self.default_value]*global_vars.ngtypes
-            elif self.type == 'list':
+            elif self.type in ['list', 'timelist']:
                 self.data = []
             else: assert False
 
@@ -84,6 +93,13 @@ class Multiline:
                         self.data.append(gtype)
                     except ( KeyError, IndexError, ValueError ):
                         multiline_parse_error(self)
+        elif self.type == 'timelist':
+            @self.data_pattern.add_parse_action
+            def timelist_repr(toks):
+                if len(toks) > self.maxlen:
+                    multiline_parse_error(self)
+                self.data.extend(set(toks))
+                self.data.sort()
         else: assert False
 
         self.string += ' '.join(self.lines)
@@ -91,10 +107,9 @@ class Multiline:
             self.data_pattern.parse_string(self.string, parseAll=True)
         except pp.ParseException:
             multiline_parse_error(self)
-        if self.type == 'list':
-            assert len(self.data) <= global_vars.ngtypes
-            self.data.extend([-1] * (global_vars.ngtypes - len(self.data)))
-            assert len(self.data) == global_vars.ngtypes
+        if self.type in ['list', 'timelist']:
+            assert len(self.data) <= self.maxlen
+            self.data.extend([-1] * (self.maxlen - len(self.data)))
 
         if None in self.data:
             multiline_parse_error(self)
@@ -102,7 +117,8 @@ class Multiline:
 # (label,Type,[default_value])
 multiline_labels_types = [('initial_state','dict',0.),
                           ('fitness','dict',1.),
-                          ('target_genotypes','list')]
+                          ('target_genotypes','list'),
+                          ('report_points','timelist')]
 
 multiline_objects = [ Multiline(*tup) for tup in multiline_labels_types ]
 
