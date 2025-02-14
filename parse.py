@@ -40,18 +40,18 @@ with open(file_name_num, "r") as file:
             else:
                 # Mid-block full comments are allowed
                 # This uses regexps, so I don't think it can fail.
-                line = oneline.comment_filter.parse_string(line).asList()[0]
+                line = oneline.comment_filter.parseString(line).asList()[0]
                 ml.lines.append(line)
             continue
 
         # Drop comments from line
         # Don't think this can fail
-        line = oneline.comment_filter.parse_string(line).asList()[0]
+        line = oneline.comment_filter.parseString(line).asList()[0]
         if line == '':
             continue
 
         try:
-            all_patterns.parse_string(line)
+            all_patterns.parseString(line)
         except pp.ParseException as e:
             eprint(e)
             eprint("Failed to parse line:\n---> {}".format(line))

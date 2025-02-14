@@ -3,6 +3,11 @@ from error_print import eprint
 import global_vars
 from functools import reduce
 
+old_common_version = '2.1.4'.split('.')
+version = pp.__version__.split('.')
+if version >= old_common_version:
+    pp.common = pp.pyparsing_common
+
 TIMELIST_LENGTH = 50
 
 def multiline_parse_error(obj):
@@ -17,9 +22,9 @@ def k_correct(obj,k):
                 multiline_parse_error(obj)
 
 data_patterns = {
-        'dict': pp.ZeroOrMore(pp.Group(pp.Word(pp.nums) +  pp.Suppress(':') + pp.common.number.add_parse_action(pp.common.convertToFloat))),
+        'dict': pp.ZeroOrMore(pp.Group(pp.Word(pp.nums) +  pp.Suppress(':') + pp.common.number.addParseAction(pp.common.convertToFloat))),
         'list': pp.ZeroOrMore(pp.Word(pp.nums)),
-        'timelist': pp.ZeroOrMore(pp.common.integer).add_parse_action(pp.common.convert_to_integer)
+        'timelist': pp.ZeroOrMore(pp.common.integer).addParseAction(pp.common.convertToInteger)
         }
 
 class Multiline:
@@ -37,7 +42,7 @@ class Multiline:
         self.firstline = label + data_patterns[self.type]
         __class__.register.setdefault(self.label, self)
 
-        @self.firstline.set_parse_action
+        @self.firstline.setParseAction
         def parseAction(s,loc,toks):
             # maxlen assigned here to give parser a chance to know what
             # ngtypes is.
@@ -67,7 +72,7 @@ class Multiline:
         self.state = False
 
         if self.type == 'dict':
-            @self.data_pattern.add_parse_action
+            @self.data_pattern.addParseAction
             def dict_repr(toks):
                 for k,v in toks:
                     k_correct(self,k)
@@ -79,7 +84,7 @@ class Multiline:
                     except ( KeyError, IndexError ):
                         multiline_parse_error(self)
         elif self.type == 'list':
-            @self.data_pattern.add_parse_action
+            @self.data_pattern.addParseAction
             def list_repr(toks):
                 for k in toks:
                     k_correct(self,k)
@@ -94,7 +99,7 @@ class Multiline:
                     except ( KeyError, IndexError, ValueError ):
                         multiline_parse_error(self)
         elif self.type == 'timelist':
-            @self.data_pattern.add_parse_action
+            @self.data_pattern.addParseAction
             def timelist_repr(toks):
                 if len(toks) > self.maxlen:
                     multiline_parse_error(self)
@@ -104,7 +109,7 @@ class Multiline:
 
         self.string += ' '.join(self.lines)
         try:
-            self.data_pattern.parse_string(self.string, parseAll=True)
+            self.data_pattern.parseString(self.string, parseAll=True)
         except pp.ParseException:
             multiline_parse_error(self)
         if self.type in ['list', 'timelist']:
