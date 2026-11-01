@@ -8,8 +8,6 @@
 #include<err.h>
 #include<assert.h>
 
-#define TIMELIST_LENGTH (50)
-
 #define uint unsigned int
 #define ulong unsigned long
 #define ushort unsigned short
@@ -33,43 +31,14 @@
     b = tmp;\
 }
 
-typedef struct _params{
-    uint number_of_loci;
-    uint number_of_alleles;
-    double rate_of_mutation;
-    double rate_of_recombination;
-    /* Not implemented */
-    // ulong population_size;
-    uint number_of_generations;
-    double threshold;
-} params;
-
-#ifdef DUMP_INPUT
-void dump_parameters(params p){
-    printf("number_of_loci: %u\n", p.number_of_loci);
-    printf("number_of_alleles;: %u\n", p.number_of_alleles);
-    printf("rate_of_mutation: %e\n", p.rate_of_mutation);
-    printf("rate_of_recombination: %e\n", p.rate_of_recombination);
-    printf("number_of_generations: %u\n", p.number_of_generations);
-    printf("threshold: %e\n", p.threshold);
-}
-
-void dump_vector(char *name, double *vec, uint len){
-    uint i = 0;
-    printf("%s: %.3e", name, vec[i++]);
-    for(;i < len; i++)
-        printf(" %.3e",vec[i]);
-    printf("\n");
-}
-
-void dump_list(char *name, uint *list, uint len){
-    uint i = 0;
-    printf("%s: %u", name, list[i++]);
-    for(;i < len; i++)
-        printf(" %u",list[i]);
-    printf("\n");
-}
-#endif
+struct params {
+  uint number_of_loci;
+  uint number_of_alleles;
+  double rate_of_mutation;
+  double rate_of_recombination;
+  uint number_of_generations;
+  double threshold;
+};
 
 double sum(double *state, uint length){
     double rtvl = 0.;
@@ -88,7 +57,7 @@ uint power(uint n, uint p){
     return rtvl;
 }
 
-ushort hamming_dst(params p, uint m, uint n){
+ushort hamming_dst(struct params p, uint m, uint n){
     uint nalleles = p.number_of_alleles;
     assert( nalleles > 0 );
 
@@ -103,7 +72,7 @@ ushort hamming_dst(params p, uint m, uint n){
     return rtvl;
 }
 
-double *mk_mutation_tbl(params p){
+double *mk_mutation_tbl(struct params p){
     uint ngtypes = power(p.number_of_alleles, p.number_of_loci);
     double *rtvl = calloc(ngtypes * ngtypes, sizeof(double));
 
@@ -123,7 +92,7 @@ double *mk_mutation_tbl(params p){
     return rtvl;
 }
 
-double *mk_recombination_tbl(params p){
+double *mk_recombination_tbl(struct params p){
     uint nloci = p.number_of_loci;
     uint nalleles = p.number_of_alleles;
     assert( nalleles != 0 );
@@ -168,7 +137,7 @@ double *mk_recombination_tbl(params p){
     return rtvl;
 }
 
-double *step(params p, double *state, double *scratch,
+double *step(struct params p, double *state, double *scratch,
         double *fitness,
         double *recombination_tbl,
         double *mutation_tbl,
@@ -214,7 +183,7 @@ double *step(params p, double *state, double *scratch,
     return state;
 }
 
-uint check_threshold(params p, double *state, uint *target_genotypes,
+uint check_threshold(struct params p, double *state, uint *target_genotypes,
         uint ngtypes, double population_size){
     uint i = 0;
     for(; i < ngtypes; i++){
@@ -229,7 +198,7 @@ uint check_threshold(params p, double *state, uint *target_genotypes,
     return -1;
 }
 
-char *base_converter(params p, uint x){
+char *base_converter(struct params p, uint x){
     assert( p.number_of_alleles <= 10 );
 
     char *rtvl = (char *)malloc(p.number_of_loci * sizeof(char));
@@ -244,7 +213,7 @@ char *base_converter(params p, uint x){
     return rtvl;
 }
 
-void print_report(FILE *stream, params p, uint ngtypes, uint time, double *state){
+void print_report(FILE *stream, struct params p, uint ngtypes, uint time, double *state){
     uint maxtime = p.number_of_generations - 1;
     int width;
     width = ceil(log10((double)(maxtime + 1)));
@@ -256,8 +225,6 @@ void print_report(FILE *stream, params p, uint ngtypes, uint time, double *state
 }
 
 int main(int argc, char **argv){
-    uint nread;
-    params p;
     char progress = 1;
 
     /* Check for progress option */
@@ -276,11 +243,8 @@ int main(int argc, char **argv){
     struct winsize w;
     if(progress) ioctl(fileno(stderr), TIOCGWINSZ, &w);
 
-    if((nread = read(fileno(stdin), &p, sizeof(p))) != sizeof(p))
-        errx(1, "Failed to read %lu bytes when reading parameters."
-                "\nRead %u instead.",
-                sizeof(p),
-                nread);
+    /* Comment tag // yaml means data must be parsed from yaml file */
+    struct params p; // ymal
 
     uint nloci = p.number_of_loci;
     uint nalleles = p.number_of_alleles;
@@ -288,50 +252,14 @@ int main(int argc, char **argv){
 
     ulong state_size = ngtypes * sizeof(double);
 
-    double *state = (double*)malloc(state_size);
-    if((nread = read(fileno(stdin), state, state_size)) != state_size)
-        errx(1, "Failed to read %lu bytes when reading: initial_state."
-                "\nRead %u instead.",
-                state_size,
-                nread);
-
-    double *fitness = (double*)malloc(state_size);
-    if((nread = read(fileno(stdin), fitness, state_size)) != state_size)
-        errx(1, "Failed to read %lu bytes when reading: fitness."
-                "\nRead %u instead."
-                ,state_size
-                ,nread);
+    /* From initial_state */
+    double *state = (double*)malloc(state_size); // yaml
+    double *fitness = (double*)malloc(state_size); // yaml
 
     uint target_genotypes_size = ngtypes * sizeof(uint);
-    uint *target_genotypes = (uint*)malloc(target_genotypes_size);
-    if((nread = read(fileno(stdin), target_genotypes, target_genotypes_size)) != target_genotypes_size)
-        errx(1, "Failed to read %u bytes when reading: target_genotypes."
-                "\nRead %u instead.",
-                target_genotypes_size,
-                nread);
-
-    uint report_points_size = TIMELIST_LENGTH * sizeof(uint);
-    uint *report_points = (uint*)malloc(report_points_size);
-    if((nread = read(fileno(stdin), report_points, report_points_size)) != report_points_size)
-        errx(1, "Failed to read %u bytes when reading: report_points."
-                "\nRead %u instead.",
-                report_points_size,
-                nread);
-
-    /* Piped from parser, so tell it that we're done by closing this
-     * end. */
-    if(close(0) != 0)
-        warnx("Couldn't close pipe from parser.");
-
-#ifdef DUMP_INPUT
-    /* If we are dumping, do it here. */
-    dump_parameters(p);
-    dump_vector("initial state", state, ngtypes);
-    dump_vector("fitness", fitness, ngtypes);
-    dump_list("targets", target_genotypes, ngtypes);
-    dump_list("report_points", report_points, TIMELIST_LENGTH);
-    return 0;
-#endif
+    uint *target_genotypes = (uint*)malloc(target_genotypes_size); // yaml
+    uint report_points_size = 0; // TODO
+    uint *report_points = (uint*)malloc(report_points_size); // yaml
 
     double *recombination_tbl = mk_recombination_tbl(p);
     double *mutation_tbl = mk_mutation_tbl(p);
