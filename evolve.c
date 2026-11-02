@@ -38,6 +38,7 @@ struct params {
   double rate_of_recombination;
   uint number_of_generations;
   double threshold;
+  uint allow_double_mutations; /* 0 or 1; effect not implemented yet */
 };
 
 double sum(double *state, uint length){
@@ -121,7 +122,6 @@ double *mk_recombination_tbl(struct params p){
                 z /= nalleles;
             }
             tri_check_bound(ngtypes, gtype1, gtype2, gtype);
-
             entry *= p.rate_of_recombination;
             if(gtype1 == gtype2 && gtype2 == gtype)
                 entry += (1 - p.rate_of_recombination);
@@ -198,30 +198,39 @@ uint check_threshold(struct params p, double *state, uint *target_genotypes,
     return -1;
 }
 
-char *base_converter(struct params p, uint x){
+/* Write genotype x into buf as number_of_loci base-nalleles digits, most
+ * significant first ("12" == 1*nalleles + 2).  buf must hold
+ * number_of_loci + 1 chars.  Returns buf. */
+char *genotype_to_str(struct params p, uint x, char *buf){
     assert( p.number_of_alleles <= 10 );
 
-    char *rtvl = (char *)malloc(p.number_of_loci * sizeof(char));
-    char s = '0';
     uint n = p.number_of_loci;
-
-    memset((void*)rtvl, (int)s, n);
+    buf[n] = '\0';
     while(n--){
-        rtvl[n] = s + x % p.number_of_alleles;
+        buf[n] = '0' + x % p.number_of_alleles;
         x /= p.number_of_alleles;
     }
-    return rtvl;
+    return buf;
+}
+
+/* Heap-allocated version; the caller frees the result. */
+char *base_converter(struct params p, uint x){
+    return genotype_to_str(p, x, malloc(p.number_of_loci + 1));
 }
 
 void print_report(FILE *stream, struct params p, uint ngtypes, uint time, double *state){
-    uint maxtime = p.number_of_generations - 1;
-    int width;
-    width = ceil(log10((double)(maxtime + 1)));
+    /* One reusable buffer instead of a malloc per genotype per report line */
+    char gstr[p.number_of_loci + 1];
+
+    /* Width of the largest generation number, computed exactly; the old
+     * ceil(log10(n)) gave width 0 for n == 1 and is off at powers of 10
+     * only by luck of rounding. */
+    int width = snprintf(NULL, 0, "%u", p.number_of_generations - 1);
+
     fprintf(stream, "%*u|", width, time);
-    uint i = 0;
-    for(; i < ngtypes; i++)
-        fprintf(stream, " %s:%.0f", base_converter(p, i), state[i]);
-    fprintf(stream, "\n");
+    for(uint i = 0; i < ngtypes; i++)
+        fprintf(stream, " %s:%.0f", genotype_to_str(p, i, gstr), state[i]);
+    fputc('\n', stream);
 }
 
 int main(int argc, char **argv){
@@ -229,11 +238,11 @@ int main(int argc, char **argv){
 
     /* Check for progress option */
     while(argc--)
-        if(strcmp(argv[argc], "-s") == 0
-                || strcmp(argv[argc],"--silent") == 0){
-            progress = 0;
-            break;
-        }
+      if(strcmp(argv[argc], "-s") == 0
+	 || strcmp(argv[argc],"--silent") == 0){
+	progress = 0;
+	break;
+      }
 
     /* Check if stderr is terminal */
     if(!isatty(fileno(stderr))) progress = 0;
@@ -241,7 +250,8 @@ int main(int argc, char **argv){
     // TODO Adapt if terminal size changes?
     /* Get winsize */
     struct winsize w;
-    if(progress) ioctl(fileno(stderr), TIOCGWINSZ, &w);
+    if(!progress || ioctl(fileno(stderr), TIOCGWINSZ, &w))
+       progress = 0;
 
     /* Comment tag // yaml means data must be parsed from yaml file */
     struct params p; // ymal
@@ -305,8 +315,11 @@ int main(int argc, char **argv){
                 mutation_tbl, population_size);
         continue;
 passed_threshold:
-        printf("%sGenotype %s passed threshold at generation %d.\n",
-                progress?"\n":"",base_converter(p, gtype), i);
+        {
+            char gstr[p.number_of_loci + 1];
+            printf("%sGenotype %s passed threshold at generation %u.\n",
+                    progress?"\n":"", genotype_to_str(p, gtype, gstr), i);
+        }
         goto report;
     }
     printf("%s%u generations run, no genotype passed threshold.\n",

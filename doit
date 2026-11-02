@@ -1,4 +1,3 @@
 #!/bin/bash
 
-# TODO Suppress stderr of ./evolve if error in ./parse.py
-./parse.py | ./evolve "$@"
+python3 yaml2c.py input.yaml evolve.c -o evolve_gen.c && gcc -O2 -o evolve evolve_gen.c -lm

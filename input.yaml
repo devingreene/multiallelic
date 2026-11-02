@@ -1,0 +1,40 @@
+number_of_loci: 2
+number_of_alleles: 3
+rate_of_mutation: 1.0e-9
+rate_of_recombination: 1.0e-3
+number_of_generations: 10000
+threshold: 0.999
+
+# Default initial state is 0
+initial_state:
+  "00": 10000
+  "01": 0
+  "02": 0
+  "10": 0
+  "11": 0
+  "12": 0
+  "20": 0
+  "21": 0
+  "22": 0
+
+# Default initial state is 1
+fitness:
+  "00": 1.2
+  "01": 1
+  "02": 1
+  "10": 1
+  "11": 1
+  "12": 1
+  "20": 1
+  "21": 1
+  "22": 1
+
+target_genotypes:
+  - "01"
+  - "02"
+  - "10"
+  - "12"
+
+report_points: [0, 2, 5, 6, 999, 9999]
+
+allow_double_mutations: 1
