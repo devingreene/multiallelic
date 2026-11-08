@@ -84,10 +84,20 @@ double *mk_mutation_tbl(struct params p){
 
     for_each_pair(gtype1, gtype2, ngtypes){
         ushort hd = hamming_dst(p, gtype1, gtype2);
-        rtvl[index(ngtypes, gtype1, gtype2)] =
+        if(p.allow_double_mutations) {
+          rtvl[index(ngtypes, gtype1, gtype2)] =
             rtvl[index(ngtypes, gtype2, gtype1)] =
             pow(p.rate_of_mutation/nalts, hd) *
             pow(1. - p.rate_of_mutation, p.number_of_loci - hd);
+        }
+        else {
+          if(hd > 1)
+            rtvl[index(ngtypes, gtype1, gtype2)] = rtvl[index(ngtypes, gtype2, gtype1)] = 0;
+          else if(hd == 1)
+            rtvl[index(ngtypes, gtype1, gtype2)] = rtvl[index(ngtypes, gtype2, gtype1)] = p.rate_of_mutation/nalts;  
+          else // hd == 0
+            rtvl[index(ngtypes, gtype1, gtype2)] = rtvl[index(ngtypes, gtype2, gtype1)] = 1 - p.number_of_loci * p.rate_of_mutation;
+        }
     }
 
     return rtvl;

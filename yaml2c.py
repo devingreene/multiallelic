@@ -127,6 +127,13 @@ def load_config(path):
     for name in ("rate_of_mutation", "rate_of_recombination"):
         if not 0.0 <= cfg[name] <= 1.0:
             raise ConfigError(f"{name} must be in [0, 1]")
+    # With double mutations off, mk_mutation_tbl gives the unmutated genotype
+    # 1 - nloci * rate_of_mutation, which must not go negative.
+    if not cfg["allow_double_mutations"] and nloci * cfg["rate_of_mutation"] > 1.0:
+        raise ConfigError(
+            f"with allow_double_mutations off, number_of_loci * rate_of_mutation "
+            f"must be <= 1 (got {nloci} * {cfg['rate_of_mutation']} = "
+            f"{nloci * cfg['rate_of_mutation']:g})")
     if not 0.0 < cfg["threshold"] <= 1.0:
         raise ConfigError("threshold must be in (0, 1]")
     if cfg["number_of_generations"] < 1:
